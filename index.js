@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'tu-secreto-jwt-super-seguro';
 
 // Configuración para Vercel
-const isVercel = process.env.VERCEL === '1';
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
 
 // Middleware
 app.use(cors());
