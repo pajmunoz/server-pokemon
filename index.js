@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'tu-secreto-jwt-super-seguro';
+const JWT_SECRET = process.env.JWT_SECRET || 'amazing';
 
 // Configuración para Vercel
 const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
