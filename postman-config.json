@@ -1,0 +1,44 @@
+{
+  "info": {
+    "name": "Pokemon Server API",
+    "description": "API del servidor de Pokémon con autenticación JWT",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "vercelUrl",
+      "value": "https://tu-proyecto.vercel.app",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "environments": {
+    "Local": {
+      "baseUrl": "http://localhost:3000",
+      "token": ""
+    },
+    "Vercel": {
+      "baseUrl": "https://tu-proyecto.vercel.app",
+      "token": ""
+    }
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
+}

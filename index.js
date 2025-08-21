@@ -9,6 +9,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'tu-secreto-jwt-super-seguro';
 
+// Configuración para Vercel
+const isVercel = process.env.VERCEL === '1';
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -519,19 +522,26 @@ app.use((error, req, res, next) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor de Pokémon iniciado en puerto ${PORT}`);
-    console.log(`📱 Endpoints disponibles:`);
-    console.log(`   POST /api/auth/register - Registro de usuario`);
-    console.log(`   POST /api/auth/login - Login de usuario`);
-    console.log(`   GET  /api/auth/profile - Perfil del usuario (protegido)`);
-    console.log(`   GET  /api/pokemon - Lista de Pokémon (protegido)`);
-    console.log(`   GET  /api/pokemon/:id - Datos de Pokémon específico (protegido)`);
-    console.log(`   GET  /api/pokemon/search/:name - Búsqueda por nombre (protegido)`);
-    console.log(`   GET  /api/pokemon/search - Búsqueda avanzada con filtros (protegido)`);
-    console.log(`   GET  /api/health - Estado del servidor`);
-    console.log(`\n🔑 Usuario de prueba: admin / password`);
-    console.log(`\n🔍 Búsquedas disponibles:`);
-    console.log(`   • Por nombre: /api/pokemon/search/pikachu`);
-    console.log(`   GET  /api/pokemon/search?name=char&type=fire&limit=10`);
-});
+if (isVercel) {
+    // Para Vercel, exportamos la app
+    module.exports = app;
+} else {
+    // Para desarrollo local
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor de Pokémon iniciado en puerto ${PORT}`);
+        console.log(`📱 Endpoints disponibles:`);
+        console.log(`   POST /api/auth/register - Registro de usuario`);
+        console.log(`   POST /api/auth/login - Login de usuario`);
+        console.log(`   GET  /api/auth/profile - Perfil del usuario (protegido)`);
+        console.log(`   GET  /api/pokemon - Lista de Pokémon (protegido)`);
+        console.log(`   GET  /api/pokemon/:id - Datos de Pokémon específico (protegido)`);
+        console.log(`   GET  /api/pokemon/search/:name - Búsqueda por nombre (protegido)`);
+        console.log(`   GET  /api/pokemon/search - Búsqueda avanzada con filtros (protegido)`);
+        console.log(`   GET  /api/health - Estado del servidor`);
+        console.log(`\n🔑 Usuario de prueba: admin / password`);
+        console.log(`\n🔍 Búsquedas disponibles:`);
+        console.log(`   • Por nombre: /api/pokemon/search/pikachu`);
+        console.log(`   • Búsqueda avanzada: /api/pokemon/search?name=char&type=fire&limit=10`);
+        console.log(`\n🌐 Desplegado en Vercel: ${isVercel ? 'Sí' : 'No'}`);
+    });
+}
