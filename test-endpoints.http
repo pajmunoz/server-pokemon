@@ -1,0 +1,74 @@
+### Variables de entorno para VS Code REST Client
+@baseUrl = http://localhost:3000
+@authToken = {{login.response.body.token}}
+
+### 1. Verificar salud del servidor
+GET {{baseUrl}}/api/health
+
+### 2. Registrar un nuevo usuario
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 3. Login con usuario existente
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "password"
+}
+
+### 4. Obtener perfil del usuario (requiere token)
+GET {{baseUrl}}/api/auth/profile
+Authorization: Bearer {{authToken}}
+
+### 5. Obtener lista de Pokémon (requiere token)
+GET {{baseUrl}}/api/pokemon?limit=5&offset=0
+Authorization: Bearer {{authToken}}
+
+### 6. Obtener datos de un Pokémon específico (requiere token)
+GET {{baseUrl}}/api/pokemon/1
+Authorization: Bearer {{authToken}}
+
+### 7. Buscar Pokémon por nombre (requiere token)
+GET {{baseUrl}}/api/pokemon/search/pikachu
+Authorization: Bearer {{authToken}}
+
+### 8. Buscar Pokémon por nombre con detalles completos (requiere token)
+GET {{baseUrl}}/api/pokemon/search/charizard?detailed=true
+Authorization: Bearer {{authToken}}
+
+### 9. Búsqueda avanzada - Pokémon tipo fuego (requiere token)
+GET {{baseUrl}}/api/pokemon/search?type=fire&limit=5
+Authorization: Bearer {{authToken}}
+
+### 10. Búsqueda avanzada - Pokémon con nombre que contenga "char" (requiere token)
+GET {{baseUrl}}/api/pokemon/search?name=char&limit=10
+Authorization: Bearer {{authToken}}
+
+### 11. Búsqueda avanzada - Pokémon tipo agua y altura mínima 10 (requiere token)
+GET {{baseUrl}}/api/pokemon/search?type=water&minHeight=10&limit=5
+Authorization: Bearer {{authToken}}
+
+### 12. Búsqueda avanzada - Pokémon con peso entre 50 y 100 (requiere token)
+GET {{baseUrl}}/api/pokemon/search?minWeight=50&maxWeight=100&limit=10
+Authorization: Bearer {{authToken}}
+
+### 13. Obtener datos de Charizard (requiere token)
+GET {{baseUrl}}/api/pokemon/6
+Authorization: Bearer {{authToken}}
+
+### 14. Obtener lista paginada de Pokémon (requiere token)
+GET {{baseUrl}}/api/pokemon?limit=10&offset=20
+Authorization: Bearer {{authToken}}
+
+### 15. Obtener datos de Mewtwo (requiere token)
+GET {{baseUrl}}/api/pokemon/150
+Authorization: Bearer {{authToken}}
