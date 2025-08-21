@@ -163,11 +163,30 @@ app.get('/api/pokemon', authenticateToken, async (req, res) => {
                 const pokemonId = offset + index + 1;
                 const pokemonResponse = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
 
+                // Obtener formas del Pokémon
+                const forms = pokemonResponse.data.forms.map(form => ({
+                    name: form.name,
+                    url: form.url
+                }));
+                
+                // Obtener movimientos (primeros 5 para la lista)
+                const moves = pokemonResponse.data.moves.slice(0, 5).map(move => ({
+                    name: move.move.name,
+                    type: move.move.name, // Simplificado para la lista
+                    url: move.move.url
+                }));
+                
                 return {
                     id: pokemonId,
                     name: pokemonResponse.data.name,
                     image: pokemonResponse.data.sprites.other.dream_world.front_default,
-                    types: pokemonResponse.data.types.map(type => type.type.name)
+                    types: pokemonResponse.data.types.map(type => type.type.name),
+                    height: pokemonResponse.data.height,
+                    weight: pokemonResponse.data.weight,
+                    base_experience: pokemonResponse.data.base_experience,
+                    abilities: pokemonResponse.data.abilities.map(ability => ability.ability.name),
+                    forms: forms,
+                    moves: moves
                 };
             })
         );

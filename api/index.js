@@ -158,19 +158,66 @@ app.get('/api/pokemon', authenticateToken, async (req, res) => {
         const response = await axios.get(`https://pokeapi.co/api/v2/pokemon?limit=1000&offset=0`);
         
         const pokemonList = await Promise.all(
-            response.data.results.slice(offset, offset + limit).map(async (pokemon, index) => {
-                const pokemonId = offset + index + 1;
-                const pokemonResponse = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+            response.data.results.map(async (pokemon, index) => {
+                // Usar la URL del Pokémon directamente para obtener el ID correcto
+                const pokemonResponse = await axios.get(pokemon.url);
+                const pokemonData = pokemonResponse.data;
+                
+                // Obtener formas del Pokémon
+                const forms = await Promise.all(
+                    pokemonData.forms.map(async (form) => {
+                        const formResponse = await axios.get(form.url);
+                        return {
+                            name: formResponse.data.name,
+                            url: form.url
+                        };
+                    })
+                );
+                
+                // Obtener movimientos (primeros 5 para la lista)
+                const moves = await Promise.all(
+                    pokemonData.moves.slice(0, 5).map(async (move) => {
+                        const moveResponse = await axios.get(move.move.url);
+                        return {
+                            name: moveResponse.data.name,
+                            type: moveResponse.data.type.name,
+                            power: moveResponse.data.power,
+                            accuracy: moveResponse.data.accuracy
+                        };
+                    })
+                );
                 
                 return {
-                    id: pokemonId,
-                    name: pokemonResponse.data.name,
-                    image: pokemonResponse.data.sprites.front_default,
-                    types: pokemonResponse.data.types.map(type => type.type.name)
+                    id: pokemonData.id,
+                    name: pokemonData.name,
+                    image: pokemonData.sprites.front_default,
+                    types: pokemonData.types.map(type => type.type.name),
+                    height: pokemonData.height,
+                    weight: pokemonData.weight,
+                    base_experience: pokemonData.base_experience,
+                    abilities: pokemonData.abilities.map(ability => ability.ability.name),
+                    forms: forms,
+                    moves: moves
                 };
             })
         );
 
+        // Log para debug
+        console.log('=== POKÉMON PROCESADO ===');
+        console.log('Total de Pokémon procesados:', pokemonList.length);
+        if (pokemonList.length > 0) {
+            console.log('Primer Pokémon:', pokemonList[0]);
+            console.log('Campos disponibles:', Object.keys(pokemonList[0]));
+            console.log('Height del primer Pokémon:', pokemonList[0]?.height);
+            console.log('Weight del primer Pokémon:', pokemonList[0]?.weight);
+            console.log('Abilities del primer Pokémon:', pokemonList[0]?.abilities);
+            console.log('Forms del primer Pokémon:', pokemonList[0]?.forms);
+            console.log('Moves del primer Pokémon:', pokemonList[0]?.moves);
+        } else {
+            console.log('No se procesaron Pokémon');
+        }
+        console.log('==========================');
+        
         res.json({
             count: pokemonList.length,
             total: response.data.count,
@@ -197,6 +244,32 @@ app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
         const speciesResponse = await axios.get(pokemon.species.url);
         const species = speciesResponse.data;
 
+        // Obtener formas
+        const forms = await Promise.all(
+            pokemon.forms.map(async (form) => {
+                const formResponse = await axios.get(form.url);
+                return {
+                    name: formResponse.data.name,
+                    url: form.url
+                };
+            })
+        );
+
+        // Obtener movimientos con detalles (primeros 10)
+        const moves = await Promise.all(
+            pokemon.moves.slice(0, 10).map(async (move) => {
+                const moveResponse = await axios.get(move.move.url);
+                return {
+                    name: moveResponse.data.name,
+                    accuracy: moveResponse.data.accuracy,
+                    power: moveResponse.data.power,
+                    pp: moveResponse.data.pp,
+                    type: moveResponse.data.type.name,
+                    damage_class: moveResponse.data.damage_class.name
+                };
+            })
+        );
+
         const pokemonData = {
             id: pokemon.id,
             name: pokemon.name,
@@ -221,6 +294,8 @@ app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
             height: pokemon.height,
             weight: pokemon.weight,
             base_experience: pokemon.base_experience,
+            forms: forms,
+            moves: moves,
             species: {
                 name: species.name,
                 color: species.color.name,
@@ -264,7 +339,14 @@ app.get('/api/pokemon/search/:name', authenticateToken, async (req, res) => {
             name: pokemon.name,
             image: pokemon.sprites.front_default,
             types: pokemon.types.map(type => type.type.name),
-            abilities: pokemon.abilities.map(ability => ability.ability.name)
+            abilities: pokemon.abilities.map(ability => ability.ability.name),
+            height: pokemon.height,
+            weight: pokemon.weight,
+            base_experience: pokemon.base_experience,
+            stats: pokemon.stats.map(stat => ({
+                name: stat.stat.name,
+                base_stat: stat.base_stat
+            }))
         };
 
         res.json(pokemonData);
@@ -381,6 +463,78 @@ app.get('/api/pokemon/search', authenticateToken, async (req, res) => {
             message: 'Error en la búsqueda avanzada',
             error: 'ADVANCED_SEARCH_ERROR'
         });
+    }
+});
+
+// Endpoint de prueba simple sin autenticación
+app.get('/api/test/pokemon', async (req, res) => {
+    try {
+        // Obtener solo un Pokémon para debug
+        const pokemonResponse = await axios.get('https://pokeapi.co/api/v2/pokemon/1');
+        const pokemon = pokemonResponse.data;
+        
+        const testData = {
+            id: pokemon.id,
+            name: pokemon.name,
+            image: pokemon.sprites.front_default,
+            types: pokemon.types.map(type => type.type.name),
+            height: pokemon.height,
+            weight: pokemon.weight,
+            base_experience: pokemon.base_experience,
+            abilities: pokemon.abilities.map(ability => ability.ability.name),
+            test_field: "Este campo debería aparecer"
+        };
+        
+        console.log('=== DATOS DE PRUEBA ===');
+        console.log('Pokémon completo:', JSON.stringify(testData, null, 2));
+        console.log('Campos disponibles:', Object.keys(testData));
+        console.log('Height:', testData.height);
+        console.log('Weight:', testData.weight);
+        console.log('Abilities:', testData.abilities);
+        console.log('========================');
+        
+        res.json({
+            message: 'Datos de prueba',
+            pokemon: testData,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Error en prueba:', error);
+        res.status(500).json({ message: 'Error en prueba', error: error.message });
+    }
+});
+
+// Endpoint de debug para probar la transmisión de datos
+app.get('/api/debug/pokemon', authenticateToken, async (req, res) => {
+    try {
+        // Obtener solo un Pokémon para debug
+        const pokemonResponse = await axios.get('https://pokeapi.co/api/v2/pokemon/1');
+        const pokemon = pokemonResponse.data;
+        
+        const debugData = {
+            id: pokemon.id,
+            name: pokemon.name,
+            image: pokemon.sprites.front_default,
+            types: pokemon.types.map(type => type.type.name),
+            height: pokemon.height,
+            weight: pokemon.weight,
+            base_experience: pokemon.base_experience,
+            abilities: pokemon.abilities.map(ability => ability.ability.name),
+            test_field: "Este campo debería aparecer"
+        };
+        
+        console.log('Datos de debug:', debugData);
+        
+        res.json({
+            message: 'Datos de debug',
+            data: debugData,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Error en debug:', error);
+        res.status(500).json({ message: 'Error en debug' });
     }
 });
 
