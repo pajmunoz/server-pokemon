@@ -163,29 +163,11 @@ app.get('/api/pokemon', authenticateToken, async (req, res) => {
                 const pokemonResponse = await axios.get(pokemon.url);
                 const pokemonData = pokemonResponse.data;
                 
-                // Obtener formas del Pokémon
-                const forms = await Promise.all(
-                    pokemonData.forms.map(async (form) => {
-                        const formResponse = await axios.get(form.url);
-                        return {
-                            name: formResponse.data.name,
-                            url: form.url
-                        };
-                    })
-                );
+                // Obtener formas del Pokémon (formato simple)
+                const forms = pokemonData.forms.map(form => form.name);
                 
-                // Obtener movimientos (primeros 5 para la lista)
-                const moves = await Promise.all(
-                    pokemonData.moves.slice(0, 5).map(async (move) => {
-                        const moveResponse = await axios.get(move.move.url);
-                        return {
-                            name: moveResponse.data.name,
-                            type: moveResponse.data.type.name,
-                            power: moveResponse.data.power,
-                            accuracy: moveResponse.data.accuracy
-                        };
-                    })
-                );
+                // Obtener movimientos (primeros 5 para la lista, formato simple)
+                const moves = pokemonData.moves.slice(0, 5).map(move => move.move.name);
                 
                 return {
                     id: pokemonData.id,
@@ -244,31 +226,11 @@ app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
         const speciesResponse = await axios.get(pokemon.species.url);
         const species = speciesResponse.data;
 
-        // Obtener formas
-        const forms = await Promise.all(
-            pokemon.forms.map(async (form) => {
-                const formResponse = await axios.get(form.url);
-                return {
-                    name: formResponse.data.name,
-                    url: form.url
-                };
-            })
-        );
+        // Obtener formas (formato simple)
+        const forms = pokemon.forms.map(form => form.name);
 
-        // Obtener movimientos con detalles (primeros 10)
-        const moves = await Promise.all(
-            pokemon.moves.slice(0, 10).map(async (move) => {
-                const moveResponse = await axios.get(move.move.url);
-                return {
-                    name: moveResponse.data.name,
-                    accuracy: moveResponse.data.accuracy,
-                    power: moveResponse.data.power,
-                    pp: moveResponse.data.pp,
-                    type: moveResponse.data.type.name,
-                    damage_class: moveResponse.data.damage_class.name
-                };
-            })
-        );
+        // Obtener movimientos (primeros 5, formato simple)
+        const moves = pokemon.moves.slice(0, 5).map(move => move.move.name);
 
         const pokemonData = {
             id: pokemon.id,

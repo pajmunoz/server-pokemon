@@ -294,7 +294,6 @@ app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
 app.get('/api/pokemon/search/:name', authenticateToken, async (req, res) => {
     try {
         const { name } = req.params;
-        const { detailed = 'false' } = req.query;
 
         // Validar que el nombre no esté vacío
         if (!name || name.trim() === '') {
@@ -308,94 +307,32 @@ app.get('/api/pokemon/search/:name', authenticateToken, async (req, res) => {
         const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name.toLowerCase().trim()}`);
         const pokemon = response.data;
 
-        // Si se solicita información detallada
-        if (detailed === 'true') {
-            // Obtener especies para información adicional
-            const speciesResponse = await axios.get(pokemon.species.url);
-            const species = speciesResponse.data;
-
-            // Obtener formas
-            const forms = await Promise.all(
-                pokemon.forms.map(async (form) => {
-                    const formResponse = await axios.get(form.url);
-                    return {
-                        name: formResponse.data.name,
-                        url: form.url
-                    };
-                })
-            );
-
-            // Obtener movimientos con detalles
-            const moves = await Promise.all(
-                pokemon.moves.slice(0, 10).map(async (move) => {
-                    const moveResponse = await axios.get(move.move.url);
-                    return {
-                        name: moveResponse.data.name,
-                        accuracy: moveResponse.data.accuracy,
-                        power: moveResponse.data.power,
-                        pp: moveResponse.data.pp,
-                        type: moveResponse.data.type.name,
-                        damage_class: moveResponse.data.damage_class.name
-                    };
-                })
-            );
-
-            const pokemonData = {
-                id: pokemon.id,
-                name: pokemon.name,
-                image: pokemon.sprites.other.dream_world.front_default,
-                images: {
-                    front_default: pokemon.sprites.front_default,
-                    front_shiny: pokemon.sprites.front_shiny,
-                    back_default: pokemon.sprites.back_default,
-                    back_shiny: pokemon.sprites.back_shiny
-                },
-                types: pokemon.types.map(type => type.type.name),
-                abilities: pokemon.abilities.map(ability => ({
-                    name: ability.ability.name,
-                    is_hidden: ability.is_hidden,
-                    slot: ability.slot
+        // Respuesta básica con formato simple
+        const pokemonData = {
+            id: pokemon.id,
+            name: pokemon.name,
+            image: pokemon.sprites.other.dream_world.front_default,
+            types: pokemon.types.map(type => type.type.name),
+            abilities: pokemon.abilities.map(ability => ability.ability.name),
+                            forms: pokemon.forms.map(form => ({
+                    name: form.name,
+                    url: form.url
                 })),
-                stats: pokemon.stats.map(stat => ({
-                    name: stat.stat.name,
-                    base_stat: stat.base_stat,
-                    effort: stat.effort
-                })),
-                height: pokemon.height,
-                weight: pokemon.weight,
-                base_experience: pokemon.base_experience,
-                forms: forms,
-                moves: moves,
-                species: {
-                    name: species.name,
-                    color: species.color.name,
-                    habitat: species.habitat?.name || 'unknown',
-                    generation: species.generation.name,
-                    description: species.flavor_text_entries
-                        .find(entry => entry.language.name === 'es')?.flavor_text ||
-                        species.flavor_text_entries
-                            .find(entry => entry.language.name === 'en')?.flavor_text ||
-                        'No description available'
-                }
-            };
+            moves: pokemon.moves.slice(0, 5).map(move => ({
+                name: move.move.name,
+                type: move.move.name,
+                url: move.move.url
+            })),
+            height: pokemon.height,
+            weight: pokemon.weight,
+            base_experience: pokemon.base_experience,
+            stats: pokemon.stats.map(stat => ({
+                name: stat.stat.name,
+                base_stat: stat.base_stat
+            }))
+        };
 
-            res.json(pokemonData);
-        } else {
-            // Respuesta básica
-            const pokemonData = {
-                id: pokemon.id,
-                name: pokemon.name,
-                image: pokemon.sprites.other.dream_world.front_default,
-                types: pokemon.types.map(type => type.type.name),
-                abilities: pokemon.abilities.map(ability => ability.ability.name),
-                stats: pokemon.stats.map(stat => ({
-                    name: stat.stat.name,
-                    base_stat: stat.base_stat
-                }))
-            };
-
-            res.json(pokemonData);
-        }
+        res.json(pokemonData);
     } catch (error) {
         console.error('Error buscando Pokémon:', error);
         if (error.response && error.response.status === 404) {
