@@ -3,9 +3,14 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const axios = require('axios');
+require('dotenv').config();
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || 'tu-secreto-jwt-super-seguro';
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'amazing';
+
+// Configuración para Vercel
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
 
 // Middleware
 app.use(cors());
@@ -39,15 +44,6 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
-
-// Ruta de salud del servidor
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'OK',
-        message: 'Servidor de Pokémon funcionando correctamente en Vercel',
-        timestamp: new Date().toISOString()
-    });
-});
 
 // Rutas de autenticación
 app.post('/api/auth/register', async (req, res) => {
@@ -105,20 +101,24 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        // Validaciones básicas
         if (!username || !password) {
             return res.status(400).json({ message: 'Usuario y contraseña son requeridos' });
         }
 
+        // Buscar usuario
         const user = users.find(u => u.username === username);
         if (!user) {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
+        // Verificar contraseña
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
+        // Generar JWT
         const token = jwt.sign(
             { id: user.id, username: user.username, email: user.email },
             JWT_SECRET,
@@ -126,6 +126,7 @@ app.post('/api/auth/login', async (req, res) => {
         );
 
         res.json({
+            success: true,
             message: 'Login exitoso',
             token,
             user: {
@@ -148,63 +149,52 @@ app.get('/api/auth/profile', authenticateToken, (req, res) => {
     });
 });
 
-// Ruta básica de Pokémon
+// Rutas de Pokémon
 app.get('/api/pokemon', authenticateToken, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 20;
         const offset = parseInt(req.query.offset) || 0;
 
         // Obtener lista de Pokémon desde la API pública
-        const response = await axios.get(`https://pokeapi.co/api/v2/pokemon?limit=1000&offset=0`);
-        
+        const response = await axios.get(`https://pokeapi.co/api/v2/pokemon?limit=${limit}&offset=${offset}`);
+
         const pokemonList = await Promise.all(
             response.data.results.map(async (pokemon, index) => {
-                // Usar la URL del Pokémon directamente para obtener el ID correcto
-                const pokemonResponse = await axios.get(pokemon.url);
-                const pokemonData = pokemonResponse.data;
+                const pokemonId = offset + index + 1;
+                const pokemonResponse = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+
+                // Obtener formas del Pokémon
+                const forms = pokemonResponse.data.forms.map(form => ({
+                    name: form.name,
+                    url: form.url
+                }));
                 
-                // Obtener formas del Pokémon (formato simple)
-                const forms = pokemonData.forms.map(form => form.name);
-                
-                // Obtener movimientos (primeros 5 para la lista, formato simple)
-                const moves = pokemonData.moves.slice(0, 5).map(move => move.move.name);
+                // Obtener movimientos (primeros 5 para la lista)
+                const moves = pokemonResponse.data.moves.slice(0, 5).map(move => ({
+                    name: move.move.name,
+                    type: move.move.name, // Simplificado para la lista
+                    url: move.move.url
+                }));
                 
                 return {
-                    id: pokemonData.id,
-                    name: pokemonData.name,
-                    image: pokemonData.sprites.front_default,
-                    types: pokemonData.types.map(type => type.type.name),
-                    height: pokemonData.height,
-                    weight: pokemonData.weight,
-                    base_experience: pokemonData.base_experience,
-                    abilities: pokemonData.abilities.map(ability => ability.ability.name),
+                    id: pokemonId,
+                    name: pokemonResponse.data.name,
+                    image: pokemonResponse.data.sprites.other.dream_world.front_default,
+                    types: pokemonResponse.data.types.map(type => type.type.name),
+                    height: pokemonResponse.data.height,
+                    weight: pokemonResponse.data.weight,
+                    base_experience: pokemonResponse.data.base_experience,
+                    abilities: pokemonResponse.data.abilities.map(ability => ability.ability.name),
                     forms: forms,
                     moves: moves
                 };
             })
         );
 
-        // Log para debug
-        console.log('=== POKÉMON PROCESADO ===');
-        console.log('Total de Pokémon procesados:', pokemonList.length);
-        if (pokemonList.length > 0) {
-            console.log('Primer Pokémon:', pokemonList[0]);
-            console.log('Campos disponibles:', Object.keys(pokemonList[0]));
-            console.log('Height del primer Pokémon:', pokemonList[0]?.height);
-            console.log('Weight del primer Pokémon:', pokemonList[0]?.weight);
-            console.log('Abilities del primer Pokémon:', pokemonList[0]?.abilities);
-            console.log('Forms del primer Pokémon:', pokemonList[0]?.forms);
-            console.log('Moves del primer Pokémon:', pokemonList[0]?.moves);
-        } else {
-            console.log('No se procesaron Pokémon');
-        }
-        console.log('==========================');
-        
         res.json({
-            count: pokemonList.length,
-            total: response.data.count,
-            next: offset + limit < response.data.count ? `/api/pokemon?limit=${limit}&offset=${offset + limit}` : null,
-            previous: offset > 0 ? `/api/pokemon?limit=${limit}&offset=${Math.max(0, offset - limit)}` : null,
+            count: response.data.count,
+            next: response.data.next,
+            previous: response.data.previous,
             results: pokemonList
         });
     } catch (error) {
@@ -213,11 +203,10 @@ app.get('/api/pokemon', authenticateToken, async (req, res) => {
     }
 });
 
-// Obtener datos de Pokémon específico por ID
 app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // Obtener datos del Pokémon
         const pokemonResponse = await axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`);
         const pokemon = pokemonResponse.data;
@@ -226,16 +215,36 @@ app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
         const speciesResponse = await axios.get(pokemon.species.url);
         const species = speciesResponse.data;
 
-        // Obtener formas (formato simple)
-        const forms = pokemon.forms.map(form => form.name);
+        // Obtener formas
+        const forms = await Promise.all(
+            pokemon.forms.map(async (form) => {
+                const formResponse = await axios.get(form.url);
+                return {
+                    name: formResponse.data.name,
+                    url: form.url
+                };
+            })
+        );
 
-        // Obtener movimientos (primeros 5, formato simple)
-        const moves = pokemon.moves.slice(0, 5).map(move => move.move.name);
+        // Obtener movimientos con detalles
+        const moves = await Promise.all(
+            pokemon.moves.slice(0, 10).map(async (move) => {
+                const moveResponse = await axios.get(move.move.url);
+                return {
+                    name: moveResponse.data.name,
+                    accuracy: moveResponse.data.accuracy,
+                    power: moveResponse.data.power,
+                    pp: moveResponse.data.pp,
+                    type: moveResponse.data.type.name,
+                    damage_class: moveResponse.data.damage_class.name
+                };
+            })
+        );
 
         const pokemonData = {
             id: pokemon.id,
             name: pokemon.name,
-            image: pokemon.sprites.front_default,
+            image: pokemon.sprites.other.dream_world.front_default,
             images: {
                 front_default: pokemon.sprites.front_default,
                 front_shiny: pokemon.sprites.front_shiny,
@@ -281,11 +290,12 @@ app.get('/api/pokemon/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Búsqueda de Pokémon por nombre
+// Ruta para buscar Pokémon por nombre
 app.get('/api/pokemon/search/:name', authenticateToken, async (req, res) => {
     try {
         const { name } = req.params;
-        
+
+        // Validar que el nombre no esté vacío
         if (!name || name.trim() === '') {
             return res.status(400).json({ 
                 message: 'El nombre del Pokémon es requerido',
@@ -293,15 +303,26 @@ app.get('/api/pokemon/search/:name', authenticateToken, async (req, res) => {
             });
         }
 
+        // Buscar Pokémon por nombre (insensible a mayúsculas/minúsculas)
         const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name.toLowerCase().trim()}`);
         const pokemon = response.data;
 
+        // Respuesta básica con formato simple
         const pokemonData = {
             id: pokemon.id,
             name: pokemon.name,
-            image: pokemon.sprites.front_default,
+            image: pokemon.sprites.other.dream_world.front_default,
             types: pokemon.types.map(type => type.type.name),
             abilities: pokemon.abilities.map(ability => ability.ability.name),
+                            forms: pokemon.forms.map(form => ({
+                    name: form.name,
+                    url: form.url
+                })),
+            moves: pokemon.moves.slice(0, 5).map(move => ({
+                name: move.move.name,
+                type: move.move.name,
+                url: move.move.url
+            })),
             height: pokemon.height,
             weight: pokemon.weight,
             base_experience: pokemon.base_experience,
@@ -318,14 +339,22 @@ app.get('/api/pokemon/search/:name', authenticateToken, async (req, res) => {
             return res.status(404).json({ 
                 message: 'Pokémon no encontrado',
                 error: 'POKEMON_NOT_FOUND',
-                searchTerm: req.params.name
+                searchTerm: req.params.name,
+                suggestions: [
+                    'Verifica que el nombre esté escrito correctamente',
+                    'Los nombres son sensibles a mayúsculas/minúsculas',
+                    'Intenta usar el nombre en inglés'
+                ]
             });
         }
-        res.status(500).json({ message: 'Error en la búsqueda' });
+        res.status(500).json({ 
+            message: 'Error en la búsqueda',
+            error: 'SEARCH_ERROR'
+        });
     }
 });
 
-// Búsqueda avanzada con filtros
+// Nueva ruta para búsqueda avanzada con filtros
 app.get('/api/pokemon/search', authenticateToken, async (req, res) => {
     try {
         const { 
@@ -428,76 +457,13 @@ app.get('/api/pokemon/search', authenticateToken, async (req, res) => {
     }
 });
 
-// Endpoint de prueba simple sin autenticación
-app.get('/api/test/pokemon', async (req, res) => {
-    try {
-        // Obtener solo un Pokémon para debug
-        const pokemonResponse = await axios.get('https://pokeapi.co/api/v2/pokemon/1');
-        const pokemon = pokemonResponse.data;
-        
-        const testData = {
-            id: pokemon.id,
-            name: pokemon.name,
-            image: pokemon.sprites.front_default,
-            types: pokemon.types.map(type => type.type.name),
-            height: pokemon.height,
-            weight: pokemon.weight,
-            base_experience: pokemon.base_experience,
-            abilities: pokemon.abilities.map(ability => ability.ability.name),
-            test_field: "Este campo debería aparecer"
-        };
-        
-        console.log('=== DATOS DE PRUEBA ===');
-        console.log('Pokémon completo:', JSON.stringify(testData, null, 2));
-        console.log('Campos disponibles:', Object.keys(testData));
-        console.log('Height:', testData.height);
-        console.log('Weight:', testData.weight);
-        console.log('Abilities:', testData.abilities);
-        console.log('========================');
-        
-        res.json({
-            message: 'Datos de prueba',
-            pokemon: testData,
-            timestamp: new Date().toISOString()
-        });
-        
-    } catch (error) {
-        console.error('Error en prueba:', error);
-        res.status(500).json({ message: 'Error en prueba', error: error.message });
-    }
-});
-
-// Endpoint de debug para probar la transmisión de datos
-app.get('/api/debug/pokemon', authenticateToken, async (req, res) => {
-    try {
-        // Obtener solo un Pokémon para debug
-        const pokemonResponse = await axios.get('https://pokeapi.co/api/v2/pokemon/1');
-        const pokemon = pokemonResponse.data;
-        
-        const debugData = {
-            id: pokemon.id,
-            name: pokemon.name,
-            image: pokemon.sprites.front_default,
-            types: pokemon.types.map(type => type.type.name),
-            height: pokemon.height,
-            weight: pokemon.weight,
-            base_experience: pokemon.base_experience,
-            abilities: pokemon.abilities.map(ability => ability.ability.name),
-            test_field: "Este campo debería aparecer"
-        };
-        
-        console.log('Datos de debug:', debugData);
-        
-        res.json({
-            message: 'Datos de debug',
-            data: debugData,
-            timestamp: new Date().toISOString()
-        });
-        
-    } catch (error) {
-        console.error('Error en debug:', error);
-        res.status(500).json({ message: 'Error en debug' });
-    }
+// Ruta de salud del servidor
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        message: 'Servidor de Pokémon funcionando correctamente',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Manejo de rutas no encontradas
@@ -511,5 +477,27 @@ app.use((error, req, res, next) => {
     res.status(500).json({ message: 'Error interno del servidor' });
 });
 
-// Exportar para Vercel
-module.exports = app;
+// Iniciar servidor
+if (isVercel) {
+    // Para Vercel, exportamos la app
+    module.exports = app;
+} else {
+    // Para desarrollo local
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor de Pokémon iniciado en puerto ${PORT}`);
+        console.log(`📱 Endpoints disponibles:`);
+        console.log(`   POST /api/auth/register - Registro de usuario`);
+        console.log(`   POST /api/auth/login - Login de usuario`);
+        console.log(`   GET  /api/auth/profile - Perfil del usuario (protegido)`);
+        console.log(`   GET  /api/pokemon - Lista de Pokémon (protegido)`);
+        console.log(`   GET  /api/pokemon/:id - Datos de Pokémon específico (protegido)`);
+        console.log(`   GET  /api/pokemon/search/:name - Búsqueda por nombre (protegido)`);
+        console.log(`   GET  /api/pokemon/search - Búsqueda avanzada con filtros (protegido)`);
+        console.log(`   GET  /api/health - Estado del servidor`);
+        console.log(`\n🔑 Usuario de prueba: admin / password`);
+        console.log(`\n🔍 Búsquedas disponibles:`);
+        console.log(`   • Por nombre: /api/pokemon/search/pikachu`);
+        console.log(`   • Búsqueda avanzada: /api/pokemon/search?name=char&type=fire&limit=10`);
+        console.log(`\n🌐 Desplegado en Vercel: ${isVercel ? 'Sí' : 'No'}`);
+    });
+}
